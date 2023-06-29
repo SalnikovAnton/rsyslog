@@ -1,4 +1,4 @@
-# Docker
+# Стенд с Vagrant c Rsyslog
 ### 1) В Vagrant разворачиваем 2 виртуальные машины web и log
 ### 2) на web настраиваем nginx
 ### 3) на log настраиваем центральный лог сервер на rsyslog
@@ -84,8 +84,8 @@ Complete!
            └─22153 nginx: worker process
 ***
 ```
-Также работу nginx проверяем на хосте. В браузере введем в адерсную строку http://192.168.56.10 
-СКРИН ТУТ
+Также работу nginx проверяем на хосте. В браузере введем в адерсную строку http://192.168.56.10   
+![Image alt](https://github.com/SalnikovAnton/rsyslog/blob/main/nginx.png)   
 
 #### 3) Настройка центрального сервера сбора логов   
 Для сбора логов будем использовать rsyslog, он должен быть установлен по умолчанию в нашей ОС
@@ -110,7 +110,51 @@ Available Packages
 rsyslog.x86_64                              8.24.0-57.el7_9.3                               updates  
 ``` 
 Для того, чтобы наш сервер мог принимать логи, нам необходимо изминить следующий файл "/etc/rsyslog.conf
-" с настройками Rsyslog и превести его в следующий вид с открытыми портами 514 (TCP и UDP)
+" с настройками Rsyslog и превести его в следующий вид с открытыми портами 514 (TCP и UDP) [rsyslog.conf](https://github.com/SalnikovAnton/rsyslog/blob/main/rsyslog.conf "rsyslog.conf")   
+Если ошибок не допущено, то у нас будут видны открытые порты TCP,UDP 514:
+```
+[root@log ~]# ss -tuln
+Netid State      Recv-Q Send-Q   Local Address:Port                  Peer Address:Port              
+udp   UNCONN     0      0                    *:111                              *:*                  
+udp   UNCONN     0      0                    *:928                              *:*                  
+udp   UNCONN     0      0                    *:514                              *:*                  
+udp   UNCONN     0      0            127.0.0.1:323                              *:*                  
+udp   UNCONN     0      0                    *:68                               *:*                  
+udp   UNCONN     0      0                 [::]:111                           [::]:*                  
+udp   UNCONN     0      0                 [::]:928                           [::]:*                  
+udp   UNCONN     0      0                 [::]:514                           [::]:*                  
+udp   UNCONN     0      0                [::1]:323                           [::]:*                  
+tcp   LISTEN     0      128                  *:22                               *:*                  
+tcp   LISTEN     0      100          127.0.0.1:25                               *:*                  
+tcp   LISTEN     0      25                   *:514                              *:*                  
+tcp   LISTEN     0      128                  *:111                              *:*                  
+tcp   LISTEN     0      128               [::]:22                            [::]:*                  
+tcp   LISTEN     0      100              [::1]:25                            [::]:*                  
+tcp   LISTEN     0      25                [::]:514                           [::]:*                  
+tcp   LISTEN     0      128               [::]:111                           [::]:*   
+``` 
+Теперь настроим отправку логов с web-сервера. Находим в файле /etc/nginx/nginx.conf раздел с логами и приводим их к следующему виду [nginx.conf](https://github.com/SalnikovAnton/rsyslog/blob/main/nginx.conf "nginx.conf")       
+Проверяем файл командой и перезапускаем nginx
+```
+[root@web ~]# nginx -t
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+[root@web ~]# vi /etc/nginx/nginx.conf
+[root@web ~]# systemctl restart nginx
+[root@web ~]# systemctl status nginx
+● nginx.service - The nginx HTTP and reverse proxy server
+   Loaded: loaded (/usr/lib/systemd/system/nginx.service; disabled; vendor preset: disabled)
+   Active: active (running) since Thu 2023-06-29 21:30:17 MSK; 3min 31s ago
+  Process: 22208 ExecStart=/usr/sbin/nginx (code=exited, status=0/SUCCESS)
+  Process: 22205 ExecStartPre=/usr/sbin/nginx -t (code=exited, status=0/SUCCESS)
+  Process: 22204 ExecStartPre=/usr/bin/rm -f /run/nginx.pid (code=exited, status=0/SUCCESS)
+ Main PID: 22210 (nginx)
+   CGroup: /system.slice/nginx.service
+           ├─22210 nginx: master process /usr/sbin/nginx
+           └─22212 nginx: worker process
+***
+``` 
+
 
 
 
