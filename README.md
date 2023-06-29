@@ -84,7 +84,7 @@ Complete!
            └─22153 nginx: worker process
 ***
 ```
-Также работу nginx проверяем на хосте. В браузере введем в адерсную строку http://192.168.56.10   
+Так же работу nginx проверяем на хосте. В браузере введем в адерсную строку http://192.168.56.10   
 ![Image alt](https://github.com/SalnikovAnton/rsyslog/blob/main/nginx.png)   
 
 #### 3) Настройка центрального сервера сбора логов   
@@ -154,7 +154,86 @@ nginx: configuration file /etc/nginx/nginx.conf test is successful
            └─22212 nginx: worker process
 ***
 ``` 
+Для проверки отправки логов удалим картинку веб-сраницы: rm /usr/share/nginx/html/img/header-background.png и несколько раз зайдем по адресу "http://192.168.50.10". На log-сервере смотрим логи
+```
+[root@log web]# cat /var/log/rsyslog/web/nginx_access.log
+Jun 29 22:57:12 web nginx_access: 192.168.56.1 - - [29/Jun/2023:22:57:12 +0300] "GET / HTTP/1.1" 200 4833 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/111.0"
+Jun 29 22:57:12 web nginx_access: 192.168.56.1 - - [29/Jun/2023:22:57:12 +0300] "GET /favicon.ico HTTP/1.1" 404 3650 "http://192.168.56.10/" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/111.0"
+Jun 29 22:57:13 web nginx_access: 192.168.56.1 - - [29/Jun/2023:22:57:13 +0300] "GET / HTTP/1.1" 200 4833 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/111.0"
+Jun 29 22:57:14 web nginx_access: 192.168.56.1 - - [29/Jun/2023:22:57:14 +0300] "GET / HTTP/1.1" 304 0 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/111.0"
 
+[root@log web]# cat /var/log/rsyslog/web/nginx_error.log 
+Jun 29 21:39:48 web nginx_error: 2023/06/29 21:39:48 [error] 22212#22212: *1 "/usr/share/nginx/html/repo/index.html" is not found (2: No such file or directory), client: 192.168.56.1, server: _, request: "GET /repo/ HTTP/1.1", host: "192.168.56.10"
+Jun 29 21:39:48 web nginx_error: 2023/06/29 21:39:48 [error] 22212#22212: *1 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 192.168.56.1, server: _, request: "GET /favicon.ico HTTP/1.1", host: "192.168.56.10", referrer: "http://192.168.56.10/repo/"
+Jun 29 22:57:12 web nginx_error: 2023/06/29 22:57:12 [error] 22335#22335: *1 open() "/usr/share/nginx/html/favicon.ico" failed (2: No such file or directory), client: 192.168.56.1, server: _, request: "GET /favicon.ico HTTP/1.1", host: "192.168.56.10", referrer: "http://192.168.56.10/"
+
+``` 
+логи отправляются корректно
+
+#### 4) Настройка аудита, контролирующего изменения конфигурации nginx
+За аудит отвечает утилита audit, проверяем её наличие
+```
+[root@web ~]# rpm -qa | grep audit
+audit-2.8.5-4.el7.x86_64
+audit-libs-2.8.5-4.el7.x86_64
+``` 
+Добавим правило, которое будет отслеживать изменения в конфигруации nginx. Для этого отредактируем файл /etc/audit/rules.d/[audit.rules](https://github.com/SalnikovAnton/rsyslog/blob/main/audit.rules "audit.rules")   
+Перезапускаем службу auditd
+```
+[root@web ~]# service auditd restart
+Stopping logging:                                          [  OK  ]
+Redirecting start to /bin/systemctl start auditd.service
+``` 
+После данных изменений у нас начнут локально записываться логи аудита. Чтобы проверить, что логи аудита начали записываться локально, нужно внести изменения в файл "/etc/nginx/nginx.conf" или поменять его атрибут, потом посмотреть информацию об изменениях: 
+```
+[root@web nginx]# ausearch -f /etc/nginx/nginx.conf
+----
+time->Thu Jun 29 22:56:20 2023
+type=CONFIG_CHANGE msg=audit(1688068580.164:1017): auid=1000 ses=4 op=updated_rules path="/etc/nginx/nginx.conf" key="nginx_conf" list=4 res=1
+----
+time->Thu Jun 29 22:56:20 2023
+type=CONFIG_CHANGE msg=audit(1688068580.164:1019): auid=1000 ses=4 op=updated_rules path="/etc/nginx/nginx.conf" key="nginx_conf" list=4 res=1
+``` 
+Также можно воспользоваться поиском по файлу "/var/log/audit/audit.log", указав наш тэг:
+```
+[root@web nginx]# grep nginx_conf /var/log/audit/audit.log
+type=CONFIG_CHANGE msg=audit(1688066946.894:1014): auid=4294967295 ses=4294967295 subj=system_u:system_r:unconfined_service_t:s0 op=add_rule key="nginx_conf" list=4 res=1
+type=CONFIG_CHANGE msg=audit(1688066946.894:1015): auid=4294967295 ses=4294967295 subj=system_u:system_r:unconfined_service_t:s0 op=add_rule key="nginx_conf" list=4 res=1
+type=CONFIG_CHANGE msg=audit(1688068580.164:1017): auid=1000 ses=4 op=updated_rules path="/etc/nginx/nginx.conf" key="nginx_conf" list=4 res=1
+type=SYSCALL msg=audit(1688068580.164:1018): arch=c000003e syscall=82 success=yes exit=0 a0=14b09d0 a1=14be2a0 a2=fffffffffffffe80 a3=7ffc628ff660 items=4 ppid=3161 pid=22315 auid=1000 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=pts0 ses=4 comm="vi" exe="/usr/bin/vi" subj=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023 key="nginx_conf"
+***
+``` 
+Далее настроим пересылку логов на удаленный сервер. Auditd по умолчанию не умеет пересылать логи, для пересылки на web-сервере потребуется установить пакет audispd-plugins:
+```
+[root@web nginx]# yum -y install audispd-plugins
+***
+Installed:
+  audispd-plugins.x86_64 0:2.8.5-4.el7                                                               
+
+Complete!
+``` 
+Правим файл /etc/audit/[auditd.conf](https://github.com/SalnikovAnton/rsyslog/blob/main/auditd.conf "auditd.conf") и /etc/audisp/plugins.d/[au-remote.conf](https://github.com/SalnikovAnton/rsyslog/blob/main/au-remote.conf "au-remote.conf") и /etc/audisp/audisp-remote.conf [audisp-remote.conf](https://github.com/SalnikovAnton/rsyslog/blob/main/audisp-remote.conf "audisp-remote.conf")   
+Перезапускаем службу auditd
+```
+[root@web nginx]# service auditd restart
+Stopping logging:                                          [  OK  ]
+Redirecting start to /bin/systemctl start auditd.service
+``` 
+На этом настройка web-сервера завершена. Далее настроим Log-сервер.   
+Отроем порт TCP 60, для этого уберем значки комментария в файле /etc/audit/auditd.conf:
+```
+tcp_listen_port = 60
+``` 
+Перезапустим службу auditd
+```
+[root@log web]# service auditd restart
+Stopping logging:                                          [  OK  ]
+Redirecting start to /bin/systemctl start auditd.service
+``` 
+На этом настройка пересылки логов аудита закончена   
+Выполним проверку
+![Image alt](https://github.com/SalnikovAnton/rsyslog/blob/main/test_1.png)   
+![Image alt](https://github.com/SalnikovAnton/rsyslog/blob/main/test_2.png)   
 
 
 
