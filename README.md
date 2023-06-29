@@ -231,7 +231,8 @@ Stopping logging:                                          [  OK  ]
 Redirecting start to /bin/systemctl start auditd.service
 ``` 
 На этом настройка пересылки логов аудита закончена   
-Выполним проверку
+Выполним проверку   
+
 ![Image alt](https://github.com/SalnikovAnton/rsyslog/blob/main/test_1.png)   
 ![Image alt](https://github.com/SalnikovAnton/rsyslog/blob/main/test_2.png)   
 
