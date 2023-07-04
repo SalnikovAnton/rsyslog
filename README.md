@@ -6,7 +6,7 @@
    
 #### 1)Создаём виртуальные машины используя  [Vagrantfile](https://github.com/SalnikovAnton/rsyslog/blob/main/Vagrantfile "Vagrantfile")  разворачиваются 2 виртуальные машины web и log  
    
-#### !!! в Vagrantfile добавлен пункт для автоматизации с помощью Ansible. Дополнительно потребуется скопировать файлы playbook.yml и nginx.conf в директорию с Vagrantfile.!!!   
+#### !!! в Vagrantfile добавлен пункт для автоматизации с помощью Ansible. Дополнительно потребуется скопировать файлы playbook.yml и nginx.conf в директорию с Vagrantfile !!!   
 
 ```
 ~/rsyslog$ vagrant status
